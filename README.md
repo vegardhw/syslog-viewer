@@ -1,6 +1,8 @@
-# syslog_viewer
+# Syslog Viewer
 
 `syslog_viewer` is a minimal Docker container for tailing and aggregating syslog files from a host system. It is designed to be run alongside other services in a homelab, giving you a simple way to stream logs from a host into a single viewable stream.
+
+Use this container to aggregate logs from systems such as Unraid and Home Assistant, making them easily accessible for powerful log viewers like [Dozzle](https://github.com/amir20/dozzle).
 
 The container:
 
