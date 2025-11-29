@@ -1,0 +1,7 @@
+services:
+  host1-syslog:
+    build: .
+    container_name: host1_syslog
+    volumes:
+      - /var/log/network:/host_syslog:ro # Replace /var/log/network with your host syslog directory
+    restart: always
