@@ -2,6 +2,12 @@ services:
   host1-syslog:
     build: .
     container_name: host1_syslog
+    environment:
+      - HOST_NAME=host1          # must match the subdirectory name under the mounted log path
     volumes:
-      - /var/log/network:/host_syslog:ro # Replace /var/log/network with your host syslog directory
+      - /var/log/network:/host_syslog:ro  # replace with your host syslog directory
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     restart: always

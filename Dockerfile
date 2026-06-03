@@ -1,24 +1,21 @@
-# Use the latest lightweight Alpine base image
-FROM alpine:latest
+FROM alpine:3.21
 
-# Install required packages including curl and lnav
+# OCI labels — links the GHCR package back to the repository
+LABEL org.opencontainers.image.source="https://github.com/vegardhw/syslog-viewer"
+LABEL org.opencontainers.image.description="Minimal syslog file aggregator and streamer"
+LABEL org.opencontainers.image.licenses="MIT"
+
+# Only install what is actually used at runtime:
+#   coreutils — provides GNU date (needed for `date -d` in entrypoint.sh)
+#   bash      — shell runtime
+# DL3018: pinning apk versions is impractical; the base image is pinned instead.
+# hadolint ignore=DL3018
 RUN apk add --no-cache \
-    curl \
     coreutils \
-    gzip \
-    bash
+    bash \
+  && mkdir /logs
 
-# Create the directory for the logs
-RUN mkdir /logs
+# Copy and mark executable in a single layer (no extra RUN chmod needed)
+COPY --chmod=755 entrypoint.sh /entrypoint.sh
 
-# Copy the entrypoint script
-COPY entrypoint.sh /entrypoint.sh
-
-# Make the script executable
-RUN chmod +x /entrypoint.sh
-
-# Expose the port for the web server
-# EXPOSE 8081
-
-# Use the custom entrypoint
 ENTRYPOINT ["/entrypoint.sh"]

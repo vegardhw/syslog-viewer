@@ -1,0 +1,5 @@
+# DL3018: Pinning apk package versions is impractical — Alpine package versions
+# change with every point release and pinned versions break quickly.
+# The base image is pinned (FROM alpine:3.21) which is the meaningful control.
+ignore:
+  - DL3018
