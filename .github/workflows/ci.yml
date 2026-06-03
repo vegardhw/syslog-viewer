@@ -1,0 +1,136 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*.*.*"]
+  pull_request:
+    branches: [main]
+
+# Cancel in-progress runs for the same ref so stale runs don't consume runners.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+
+  # ---------------------------------------------------------------------------
+  # 1. Lint — shellcheck + hadolint
+  # ---------------------------------------------------------------------------
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: ShellCheck
+        uses: ludeeus/action-shellcheck@2.0.0
+        with:
+          scandir: "."
+
+      - name: Hadolint
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+
+  # ---------------------------------------------------------------------------
+  # 2. Security scan — build the image locally and run Trivy
+  #    Runs on every push and PR so vulnerabilities are caught before merge.
+  # ---------------------------------------------------------------------------
+  scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: lint
+    permissions:
+      contents: read
+      security-events: write   # required to upload SARIF to GitHub Security tab
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Build for scanning (single platform, loaded into the local daemon)
+      - name: Build image for scanning
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: syslog-viewer:scan
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: syslog-viewer:scan
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+
+      # Always upload the SARIF report so results appear in the Security tab
+      # even when the step above fails.
+      - name: Upload Trivy SARIF to GitHub Security tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
+
+  # ---------------------------------------------------------------------------
+  # 3. Publish — build multi-platform image and push to GHCR
+  #    Only runs on non-PR events (pushes to any branch and version tags).
+  #    Requires lint and scan to pass first.
+  # ---------------------------------------------------------------------------
+  publish:
+    name: Publish to GHCR
+    runs-on: ubuntu-latest
+    needs: [lint, scan]
+    if: github.event_name != 'pull_request'
+    permissions:
+      contents: read
+      packages: write   # required to push to ghcr.io
+    steps:
+      - uses: actions/checkout@v4
+
+      # QEMU lets Buildx cross-compile for arm64 on the amd64 runner.
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Derive image tags from the git ref:
+      #   branch push  → ghcr.io/<owner>/syslog-viewer:<branch-name>
+      #   main push    → ghcr.io/<owner>/syslog-viewer:latest + sha-<short>
+      #   v1.2.3 tag   → ghcr.io/<owner>/syslog-viewer:1.2.3, :1.2, :1, :latest
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

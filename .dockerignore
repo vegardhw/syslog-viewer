@@ -1,0 +1,30 @@
+# Git
+.git
+.gitignore
+
+# Docs & meta (not needed in the image)
+README.md
+AGENTS.md
+LICENSE
+
+# Compose file (runtime config, not part of the image)
+docker-compose.yml
+
+# Local env overrides
+.env
+.env.*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Local log files
+*.log
+logs/

@@ -1,0 +1,21 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Local log files (e.g. from manual testing)
+*.log
+logs/
+
+# Local env overrides
+.env
+.env.*
+
+# Agent instructions (contains private config, not for public repos)
+AGENTS.md
